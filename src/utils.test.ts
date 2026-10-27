@@ -1,4 +1,9 @@
-import { getChangelogEntry, BumpLevels, sortTheThings } from "./utils";
+import {
+  getChangelogEntry,
+  BumpLevels,
+  sortTheThings,
+  extractPublishedPackages,
+} from "./utils";
 
 let changelog = `# @keystone-alpha/email
 
@@ -98,4 +103,43 @@ test("it sorts the things right", () => {
     },
   ];
   expect(things.sort(sortTheThings)).toMatchSnapshot();
+});
+
+describe("extractPublishedPackages", () => {
+  it("parses legacy New tag lines", () => {
+    expect(
+      extractPublishedPackages(`🦋  New tag: @scope/pkg@1.2.3`)
+    ).toEqual({ name: "@scope/pkg", version: "1.2.3" });
+  });
+
+  it("parses Publishing at lines", () => {
+    expect(
+      extractPublishedPackages(`Publishing "my-pkg" at "0.1.0"`)
+    ).toEqual({ name: "my-pkg", version: "0.1.0" });
+  });
+
+  it("parses changesets CLI v3 bare name@version lines", () => {
+    expect(extractPublishedPackages(`@graphql-tools/utils@13.2.0`)).toEqual({
+      name: "@graphql-tools/utils",
+      version: "13.2.0",
+    });
+    expect(extractPublishedPackages(`graphql-tools@10.0.7`)).toEqual({
+      name: "graphql-tools",
+      version: "10.0.7",
+    });
+  });
+
+  it("strips ANSI codes before matching", () => {
+    expect(
+      extractPublishedPackages(`\u001b[1G\u001b[J@graphql-tools/load@9.1.0`)
+    ).toEqual({ name: "@graphql-tools/load", version: "9.1.0" });
+  });
+
+  it("does not treat path-like lines as packages", () => {
+    expect(extractPublishedPackages(`packages/foo@1.2.3`)).toBeNull();
+  });
+
+  it("ignores the Successfully published header", () => {
+    expect(extractPublishedPackages(`Successfully published:`)).toBeNull();
+  });
 });

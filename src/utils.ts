@@ -98,3 +98,43 @@ export function sortTheThings(
   }
   return -1;
 }
+
+// Strip CSI sequences (colors, cursor moves from publish spinners, etc.)
+const ANSI_REGEX = /\u001b\[[0-9;]*[A-Za-z]/g;
+// Scoped or unscoped package name + version (changesets CLI v3 publish lines).
+// Disallow `/` in name segments so path-like `packages/foo@1.2.3` is not matched.
+const NAME_AT_VERSION_REGEX = /^(@[^/\s]+\/[^@/\s]+|[^@/\s]+)@([^\s]+)$/;
+
+/**
+ * Detect a published package from a single line of `changeset publish` stdout.
+ * Supports legacy CLI v2 (`New tag:` / `Publishing "…" at "…"`) and CLI v3
+ * (`Successfully published:` followed by bare `name@version` lines).
+ */
+export function extractPublishedPackages(
+  line: string
+): { name: string; version: string } | null {
+  const cleaned = line.replace(ANSI_REGEX, "").trim();
+
+  let newTagRegex = /New tag:\s+(@[^/]+\/[^@]+|[^/]+)@([^\s]+)/;
+  let match = cleaned.match(newTagRegex);
+
+  if (match === null) {
+    let npmOutRegex = /Publishing "(.*?)" at "(.*?)"/;
+    match = cleaned.match(npmOutRegex);
+  }
+
+  // @changesets/cli v3 prints:
+  //   Successfully published:
+  //   @scope/pkg@1.2.3
+  //   pkg@1.2.3
+  if (match === null) {
+    match = cleaned.match(NAME_AT_VERSION_REGEX);
+  }
+
+  if (match) {
+    const [, name, version] = match;
+    return { name, version };
+  }
+
+  return null;
+}

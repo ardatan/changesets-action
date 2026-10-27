@@ -422,6 +422,39 @@ describe("publish", () => {
     expect(params.body).toContain(`change something in b`);
   });
 
+  it("should create an aggregated github release from changesets CLI v3 publish output", async () => {
+    let cwd = f.copy("simple-project-published");
+    linkNodeModules(cwd);
+
+    mockedExecResponse = {
+      exitCode: 0,
+      stderr: "",
+      stdout: [
+        `🦋 changeset v3.0.3`,
+        `Successfully published:`,
+        `simple-project-pkg-a@0.0.1`,
+        `simple-project-pkg-b@0.0.1`,
+      ].join("\n"),
+    };
+
+    const response = await runPublish({
+      githubToken: "@@GITHUB_TOKEN",
+      createGithubReleases: "aggregate",
+      script: "npm run release",
+      githubReleaseName: "October 26, 2026",
+      githubReleaseAssets: [],
+      cwd,
+    });
+
+    expect(response.published).toBeTruthy();
+    response.published && expect(response.publishedPackages.length).toBe(2);
+    expect(mockedGithubMethods.repos.createRelease.mock.calls.length).toBe(1);
+    const params = mockedGithubMethods.repos.createRelease.mock.calls[0][0];
+    expect(params.name).toBe("October 26, 2026");
+    expect(params.body).toContain(`## simple-project-pkg-a@0.0.1`);
+    expect(params.body).toContain(`## simple-project-pkg-b@0.0.1`);
+  });
+
   it("should allow to customize release title with createGithubReleases: aggreate", async () => {
     let cwd = f.copy("simple-project-published");
     linkNodeModules(cwd);

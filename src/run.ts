@@ -12,6 +12,7 @@ import {
   getChangedPackages,
   sortTheThings,
   getVersionsByDirectory,
+  extractPublishedPackages,
 } from "./utils";
 import * as gitUtils from "./gitUtils";
 import readChangesetState from "./readChangesetState";
@@ -204,15 +205,14 @@ export async function runPublish({
   let releasedPackages: Package[] = [];
 
   if (tool !== "root") {
-    let newTagRegex = /New tag:\s+(@[^/]+\/[^@]+|[^/]+)@([^\s]+)/;
     let packagesByName = new Map(packages.map((x) => [x.packageJson.name, x]));
 
     for (let line of changesetPublishOutput.stdout.split("\n")) {
-      let match = line.match(newTagRegex);
+      let match = extractPublishedPackages(line);
       if (match === null) {
         continue;
       }
-      let pkgName = match[1];
+      let pkgName = match.name;
       let pkg = packagesByName.get(pkgName);
       if (pkg === undefined) {
         throw new Error(
@@ -251,10 +251,11 @@ export async function runPublish({
       );
     }
     let pkg = packages[0];
-    let newTagRegex = /New tag:/;
 
     for (let line of changesetPublishOutput.stdout.split("\n")) {
-      let match = line.match(newTagRegex);
+      // root: legacy `New tag:` or CLI v3 bare `name@version` / any publish line
+      let match =
+        /New tag:/.test(line) || extractPublishedPackages(line) !== null;
 
       if (match) {
         releasedPackages.push(pkg);
